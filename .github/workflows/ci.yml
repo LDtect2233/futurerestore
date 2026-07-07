@@ -24,92 +24,105 @@ jobs:
           submodules: 'true'
           fetch-depth: 0
       
-      - name: Linux Build
-        id: Linux
-        uses: addnab/docker-run-action@v3
-        with:
-          image: debian:buster-slim
-          options: -v ${{ github.workspace }}:/github/workspace
-          run: |
-            # Copy the repository to a working directory inside the container
-            cp -r /github/workspace /tmp/Builder/repos/futurerestore
-            cd /tmp/Builder/repos/futurerestore
-            
-            # Run the build scripts
-            ./.github/workflows/linux-bootstrap.sh
-            ./.github/workflows/linux-build.sh
-            ./.github/workflows/linux-post.sh
-            
-            # Copy the generated artifacts back to the workspace
-            cp *.tar.xz /github/workspace/.github/workflows/ || true
-            cp name*.txt /github/workspace/.github/workflows/ || true
-
-      - name: Create artifact directories
-        id: Create-Dirs
+      - name: Install dependencies
         run: |
-          mkdir -p ${{ github.workspace }}/artifacts
-          # Check if files exist and copy them
-          if ls ${{ github.workspace }}/.github/workflows/futurerestore*.tar.xz 1> /dev/null 2>&1; then
-            cp ${{ github.workspace }}/.github/workflows/futurerestore*.tar.xz ${{ github.workspace }}/artifacts/
-          fi
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            curl \
+            libssl-dev \
+            libusb-1.0-0-dev \
+            libreadline-dev \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            xz-utils \
+            file \
+            unzip
 
-      - name: Linux x86_64 RELEASE Build
-        id: Linux-x86_64-RELEASE-Build
+      - name: Build Linux futurerestore
         run: |
-          if [ -f "${{ github.workspace }}/.github/workflows/futurerestore1.tar.xz" ]; then
-            sudo chown -R $USER:$USER ${{ github.workspace }}/../
-            mv ${{ github.workspace }}/.github/workflows/futurerestore1.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name1.txt 2>/dev/null || echo "futurerestore-Linux-x86_64-RELEASE.tar.xz")
+          # Make scripts executable
+          chmod +x .github/workflows/linux-*.sh
+          
+          # Run the build scripts
+          ./.github/workflows/linux-bootstrap.sh
+          ./.github/workflows/linux-build.sh
+          ./.github/workflows/linux-post.sh
+          
+          # List generated files
+          echo "=== Generated files ==="
+          ls -la *.tar.xz || echo "No tar.xz files found"
+          ls -la name*.txt || echo "No name*.txt files found"
+          echo "======================"
+
+      - name: Rename Linux artifacts
+        run: |
+          # Rename artifacts using the names from the build scripts
+          if [ -f "futurerestore1.tar.xz" ] && [ -f "name1.txt" ]; then
+            NEW_NAME=$(cat name1.txt)
+            mv futurerestore1.tar.xz "$NEW_NAME"
+            echo "Renamed futurerestore1.tar.xz to $NEW_NAME"
+          elif [ -f "futurerestore1.tar.xz" ]; then
+            mv futurerestore1.tar.xz futurerestore-Linux-x86_64-RELEASE.tar.xz
+            echo "Renamed futurerestore1.tar.xz to futurerestore-Linux-x86_64-RELEASE.tar.xz"
           else
-            echo "Warning: futurerestore1.tar.xz not found, skipping rename"
+            echo "Warning: futurerestore1.tar.xz not found"
           fi
-
-      - name: Linux x86_64 DEBUG Build
-        id: Linux-x86_64-DEBUG-Build
-        run: |
-          if [ -f "${{ github.workspace }}/.github/workflows/futurerestore2.tar.xz" ]; then
-            mv ${{ github.workspace }}/.github/workflows/futurerestore2.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name2.txt 2>/dev/null || echo "futurerestore-Linux-x86_64-DEBUG.tar.xz")
+          
+          if [ -f "futurerestore2.tar.xz" ] && [ -f "name2.txt" ]; then
+            NEW_NAME=$(cat name2.txt)
+            mv futurerestore2.tar.xz "$NEW_NAME"
+            echo "Renamed futurerestore2.tar.xz to $NEW_NAME"
+          elif [ -f "futurerestore2.tar.xz" ]; then
+            mv futurerestore2.tar.xz futurerestore-Linux-x86_64-DEBUG.tar.xz
+            echo "Renamed futurerestore2.tar.xz to futurerestore-Linux-x86_64-DEBUG.tar.xz"
           else
-            echo "Warning: futurerestore2.tar.xz not found, skipping rename"
+            echo "Warning: futurerestore2.tar.xz not found"
           fi
-
-      - name: Linux x86_64 ASAN Build
-        id: Linux-x86_64-ASAN-Build
-        run: |
-          if [ -f "${{ github.workspace }}/.github/workflows/futurerestore3.tar.xz" ]; then
-            mv ${{ github.workspace }}/.github/workflows/futurerestore3.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name3.txt 2>/dev/null || echo "futurerestore-Linux-x86_64-ASAN.tar.xz")
+          
+          if [ -f "futurerestore3.tar.xz" ] && [ -f "name3.txt" ]; then
+            NEW_NAME=$(cat name3.txt)
+            mv futurerestore3.tar.xz "$NEW_NAME"
+            echo "Renamed futurerestore3.tar.xz to $NEW_NAME"
+          elif [ -f "futurerestore3.tar.xz" ]; then
+            mv futurerestore3.tar.xz futurerestore-Linux-x86_64-ASAN.tar.xz
+            echo "Renamed futurerestore3.tar.xz to futurerestore-Linux-x86_64-ASAN.tar.xz"
           else
-            echo "Warning: futurerestore3.tar.xz not found, skipping rename"
+            echo "Warning: futurerestore3.tar.xz not found"
           fi
 
-      - name: List artifacts
-        id: List-Artifacts
+      - name: List final artifacts
         run: |
-          echo "Files in .github/workflows:"
-          ls -la ${{ github.workspace }}/.github/workflows/ || echo "No files found"
+          echo "=== Final artifacts ==="
+          ls -la *.tar.xz || echo "No tar.xz files found"
+          echo "======================"
 
-      - name: futurerestore Linux x86_64 RELEASE Archive
-        id: futurerestore-Linux-x86_64-RELEASE-Archive
+      - name: Upload Linux RELEASE binary
         uses: actions/upload-artifact@v4
         with:
-          name: futurerestore-Linux-x86_64-RELEASE
+          name: futurerestore-Linux-RELEASE
           path: |
-            ${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-RELEASE.tar.xz
+            futurerestore-Linux-x86_64*-RELEASE.tar.xz
+            futurerestore-Linux-RELEASE.tar.xz
           if-no-files-found: warn
 
-      - name: futurerestore Linux x86_64 DEBUG Archive
-        id: futurerestore-Linux-x86_64-DEBUG-Archive
+      - name: Upload Linux DEBUG binary
         uses: actions/upload-artifact@v4
         with:
-          name: futurerestore-Linux-x86_64-DEBUG
+          name: futurerestore-Linux-DEBUG
           path: |
-            ${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-DEBUG.tar.xz
+            futurerestore-Linux-x86_64*-DEBUG.tar.xz
+            futurerestore-Linux-DEBUG.tar.xz
           if-no-files-found: warn
 
-      - name: futurerestore Linux x86_64 ASAN Archive
-        id: futurerestore-Linux-x86_64-ASAN-Archive
+      - name: Upload Linux ASAN binary
         uses: actions/upload-artifact@v4
         with:
-          name: futurerestore-Linux-x86_64-ASAN
+          name: futurerestore-Linux-ASAN
           path: |
-            ${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-ASAN.tar.xz
+            futurerestore-Linux-x86_64*-ASAN.tar.xz
+            futurerestore-Linux-ASAN.tar.xz
           if-no-files-found: warn
