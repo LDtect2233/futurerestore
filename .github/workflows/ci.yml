@@ -24,9 +24,21 @@ jobs:
           submodules: 'true'
           fetch-depth: 0
       
-      - name: Install dependencies
+      - name: Fix apt and install dependencies
         run: |
-          sudo apt-get update
+          # Kill any apt processes that might be running
+          sudo pkill -9 apt || true
+          sudo pkill -9 dpkg || true
+          
+          # Clean up apt locks and cache
+          sudo rm -f /var/lib/apt/lists/lock
+          sudo rm -f /var/cache/apt/archives/lock
+          sudo rm -f /var/lib/dpkg/lock*
+          sudo dpkg --configure -a
+          
+          # Update and install
+          sudo apt-get clean
+          sudo apt-get update --fix-missing
           sudo apt-get install -y \
             build-essential \
             git \
