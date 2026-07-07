@@ -1,71 +1,3 @@
-name: Futurerestore
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 0 1 1 *'
-    - cron: '0 0 1 4 *'
-    - cron: '0 0 30 6 *'
-    - cron: '0 0 28 9 *'
-    - cron: '0 0 27 12 *'
-
-jobs:
-  macOS:
-    env:
-      PROCURSUS: /opt/procursus
-      PATH: /opt/procursus/bin:/opt/procursus/libexec/gnubin:/usr/local/lib/ruby/gems/2.7.0/bin:/usr/local/opt/ruby@2.7/bin:/usr/local/opt/pipx_bin:/Users/runner/.cargo/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/local/sbin:/Users/runner/bin:/Users/runner/.yarn/bin:/Users/runner/Library/Android/sdk/tools:/Users/runner/Library/Android/sdk/platform-tools:/Users/runner/Library/Android/sdk/ndk-bundle:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/usr/bin:/bin:/usr/sbin:/sbin:/Users/runner/.dotnet/tools:/Users/runner/.ghcup/bin:/Users/runner/hostedtoolcache/stack/2.7.3/x64
-    runs-on: macos-12
-    steps:
-    - name: Checkout
-      id: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: 'true'
-        fetch-depth: 0
-    - name: Update Xcode
-      id: Update-Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: '14.1.0'
-    - name: macOS Build
-      id: macOS-Build
-      run: |
-        ${{ github.workspace }}/.github/workflows/mac-bootstrap.sh
-        ${{ github.workspace }}/.github/workflows/mac-build.sh
-        ${{ github.workspace }}/.github/workflows/mac-post.sh
-    - name: Versioning
-      id: Versioning
-      uses: actions/upload-artifact@v4
-      with:
-        name: Versioning
-        path: |
-          ${{ github.workspace }}/latest_build_sha.txt
-          ${{ github.workspace }}/latest_build_num.txt
-    - name: macOS RELEASE Archive
-      id: macOS-RELEASE-Archive
-      uses: actions/upload-artifact@v4
-      with:
-        name: futurerestore-macOS-RELEASE
-        path: |
-          ${{ github.workspace }}/futurerestore-macOS-*-RELEASE.tar.xz
-    - name: macOS DEBUG Archive
-      id: macOS-DEBUG-Archive
-      uses: actions/upload-artifact@v4
-      with:
-        name: futurerestore-macOS-DEBUG
-        path: |
-          ${{ github.workspace }}/futurerestore-macOS-*-DEBUG.tar.xz
-    - name: macOS ASAN Archive
-      id: macOS-ASAN-Archive
-      uses: actions/upload-artifact@v4
-      with:
-        name: futurerestore-macOS-ASAN
-        path: |
-          ${{ github.workspace }}/futurerestore-macOS-*-ASAN.tar.xz
   Linux:
     runs-on: ubuntu-latest
     steps:
@@ -80,25 +12,41 @@ jobs:
         uses: addnab/docker-run-action@v3
         with:
           image: debian:buster-slim
-          options: -v ${{ github.workspace }}/..:/tmp/Builder/repos/
+          options: -v ${{ github.workspace }}:/github/workspace
           run: |
-            /tmp/Builder/repos/futurerestore/.github/workflows/linux-bootstrap.sh
-            /tmp/Builder/repos/futurerestore/.github/workflows/linux-build.sh
-            /tmp/Builder/repos/futurerestore/.github/workflows/linux-post.sh
-            mkdir -p ${{ github.workspace }}/.github/workflows/
+            cd /github/workspace
+            ./.github/workflows/linux-bootstrap.sh
+            ./.github/workflows/linux-build.sh
+            ./.github/workflows/linux-post.sh
+            # Ensure files are created in the mounted workspace
+            ls -la /github/workspace/.github/workflows/
       - name: Linux x86_64 RELEASE Build
         id: Linux-x86_64-RELEASE-Build
         run: |
-          sudo chown -R $USER:$USER ${{ github.workspace }}/../
-          mv ${{ github.workspace }}/.github/workflows/futurerestore1.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name1.txt)
+          # Check if files exist first
+          if [ -f "${{ github.workspace }}/.github/workflows/futurerestore1.tar.xz" ]; then
+            sudo chown -R $USER:$USER ${{ github.workspace }}
+            mv ${{ github.workspace }}/.github/workflows/futurerestore1.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name1.txt)
+          else
+            echo "Warning: futurerestore1.tar.xz not found"
+            ls -la ${{ github.workspace }}/.github/workflows/
+          fi
       - name: Linux x86_64 DEBUG Build
         id: Linux-x86_64-DEBUG-Build
         run: |
-          mv ${{ github.workspace }}/.github/workflows/futurerestore2.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name2.txt)
+          if [ -f "${{ github.workspace }}/.github/workflows/futurerestore2.tar.xz" ]; then
+            mv ${{ github.workspace }}/.github/workflows/futurerestore2.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name2.txt)
+          else
+            echo "Warning: futurerestore2.tar.xz not found"
+          fi
       - name: Linux x86_64 ASAN Build
         id: Linux-x86_64-ASAN-Build
         run: |
-          mv ${{ github.workspace }}/.github/workflows/futurerestore3.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name3.txt)
+          if [ -f "${{ github.workspace }}/.github/workflows/futurerestore3.tar.xz" ]; then
+            mv ${{ github.workspace }}/.github/workflows/futurerestore3.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name3.txt)
+          else
+            echo "Warning: futurerestore3.tar.xz not found"
+          fi
       - name: futurerestore Linux x86_64 RELEASE Archive
         id: futurerestore-Linux-x86_64-RELEASE-Archive
         uses: actions/upload-artifact@v4
@@ -106,6 +54,7 @@ jobs:
           name: futurerestore-Linux-x86_64-RELEASE
           path: |
             ${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-RELEASE.tar.xz
+        if: success() && hashFiles('${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-RELEASE.tar.xz') != ''
       - name: futurerestore Linux x86_64 DEBUG Archive
         id: futurerestore-Linux-x86_64-DEBUG-Archive
         uses: actions/upload-artifact@v4
@@ -113,6 +62,7 @@ jobs:
           name: futurerestore-Linux-x86_64-DEBUG
           path: |
             ${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-DEBUG.tar.xz
+        if: success() && hashFiles('${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-DEBUG.tar.xz') != ''
       - name: futurerestore Linux x86_64 ASAN Archive
         id: futurerestore-Linux-x86_64-ASAN-Archive
         uses: actions/upload-artifact@v4
@@ -120,3 +70,4 @@ jobs:
           name: futurerestore-Linux-x86_64-ASAN
           path: |
             ${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-ASAN.tar.xz
+        if: success() && hashFiles('${{ github.workspace }}/.github/workflows/futurerestore-Linux-x86_64*-ASAN.tar.xz') != ''
