@@ -54,8 +54,8 @@ jobs:
           
           # List generated files
           echo "=== Generated files ==="
-          ls -la *.tar.xz || echo "No tar.xz files found"
-          ls -la name*.txt || echo "No name*.txt files found"
+          ls -la *.tar.xz 2>/dev/null || echo "No tar.xz files found"
+          ls -la name*.txt 2>/dev/null || echo "No name*.txt files found"
           echo "======================"
 
       - name: Rename Linux artifacts
@@ -97,7 +97,7 @@ jobs:
       - name: List final artifacts
         run: |
           echo "=== Final artifacts ==="
-          ls -la *.tar.xz || echo "No tar.xz files found"
+          ls -la *.tar.xz 2>/dev/null || echo "No tar.xz files found"
           echo "======================"
 
       - name: Upload Linux RELEASE binary
